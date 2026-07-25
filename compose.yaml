@@ -1,0 +1,50 @@
+services:
+  app:
+    image: ${APP_IMAGE}
+    container_name: blazor-app
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${APP_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://+:${APP_PORT:-8080}
+      ConnectionStrings__DefaultConnection: Data Source=${SQLITE_PATH:-/data/app.db}
+      TZ: ${TZ:-Europe/Helsinki}
+    expose:
+      - "${APP_PORT:-8080}"
+    volumes:
+      - app_data:/data
+    networks:
+      - web
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:${APP_PORT:-8080}/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - web
+    depends_on:
+      app:
+        condition: service_started
+
+networks:
+  web:
+
+volumes:
+  app_data:
+  caddy_data:
+  caddy_config:
